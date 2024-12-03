@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { hightlightsSlides } from '../constants'
 import gsap from 'gsap'
+import { ScrollTrigger } from "gsap/all";
+gsap.registerPlugin(ScrollTrigger);
 import { pauseImg, playImg, replayImg } from '../utils'
 import { useGSAP } from '@gsap/react'
 
@@ -23,20 +25,89 @@ const VideoCarousel = () => {
     const {isEnd, isLastVideo, startPlay, videoId, isPlaying} = video
 
     useGSAP(()=> {
-        gsap.to('#video', {
-            scrollTrigger: {
-                trigger: '#video',
-                toggleActions: 'restart none none none'
-            },
-            onComplete: () => {
-                setVideo((pre) => ({
-                    ...pre,
-                    startPlay: true,
-                    isPlaying: true,
-                }))
-            }
+        gsap.to('#slider', {
+            transform: `translateX(${-100 * videoId}%)`,
+            duration: 2,
+            ease: 'power2.inOut' // I think I should look for another one from the docs
         })
-    }, [isEnd, videoId])
+
+         // video animation to play the video when it is in the view
+    gsap.to("#video", {
+        scrollTrigger: {
+          trigger: "#video",
+          toggleActions: "restart none none none",
+        },
+        onComplete: () => {
+          setVideo((pre) => ({
+            ...pre,
+            startPlay: true,
+            isPlaying: true,
+          }));
+        },
+      });
+    }, [isEnd, videoId]);
+
+    
+
+    useEffect(()=>{
+        let currentProgress = 0
+        let span = videoSpanRef.current;
+
+        if(span[videoId]){
+            //animate the progress of the video that button below
+            let anim = gsap.to(span[videoId], {
+                onUpdate: () => {
+                    const progress = Math.ceil(anim.progress() * 100)
+                    if (progress != currentProgress){
+                        currentProgress = progress;
+                        gsap.to(videoDivRef.current[videoId], {
+                            width: window.innerWidth < 760
+                            ? '10vw': // for mobile
+                            window.innerWidth < 1200
+                            ? '10vw' // for tablets
+                            : '4vw' // for laptops like mine
+                        })
+
+                        // This changes color of the bar during animation
+                        gsap.to(span[videoId], {
+                            width: `${currentProgress}%`,
+                            backgroundColor: 'white'
+                        })
+                    }
+                },
+
+                 // when the video is ended, replace the progress bar with the indicator and change the background color
+                onComplete: () => {
+                    if(isPlaying){
+                        gsap.to(videoDivRef.current[videoId], {
+                            width : `12px`
+                        })
+                        gsap.to(span[videoId], {
+                            backgroundColor: '#afafaf'
+                        })
+                    }
+                },
+            })
+
+            if(videoId == 0){
+                anim.restart();
+            }
+
+            const animUpdate = () => {
+                anim.progress(videoRef.current[videoId].currentTime / hightlightsSlides[videoId]. videoDuration)
+            }
+    
+            if(isPlaying){
+                // ticker to update the progress bar
+                gsap.ticker.add(animUpdate)
+            }
+            else{
+                // remove the ticker when the video is paused (progress bar is stopped)
+                gsap.ticker.remove(animUpdate)
+            }
+        }
+    },[videoId, startPlay])
+
 
     useEffect(()=> {
 
@@ -50,18 +121,6 @@ const VideoCarousel = () => {
     },[startPlay, videoId, isPlaying, loadedData])
 
     const handleLoadedMetadata = (i,e) => setloadedData((pre) => [...pre, e])
-
-    useEffect(()=>{
-        const currentProgress = 0
-        let span = videoSpanRef.current;
-        if(span[videoId]){
-            //animate the progress of the video that button below
-            let anim = gsap.to(span[videoId], {
-                onUpdate: () => {},
-                onComplete: () => {},
-            })
-        }
-    },[videoId, startPlay])
 
     const handleProcess = (type, i) => {
         switch(type){
@@ -77,7 +136,10 @@ const VideoCarousel = () => {
                 break;
             case 'play':
                 setVideo((pre) => ({...pre , isPlaying: !pre.isPlaying}))
-                break
+                break;
+            case 'pause':
+                setVideo((pre) => ({...pre , isPlaying: !pre.isPlaying}))
+                break;
             default:
                 return video
         }
@@ -91,14 +153,21 @@ const VideoCarousel = () => {
                 <div className='video-carousel_container'>
                 <div className='w-full h-full flex-center rounded-3xl overflow-hidden bg-black'>
                     <video
-                    className='video'
+                    id='video'
                     playsInline={true}
                     preload='auto'
+                    className={`${list.id === 2 && 'translate-x-44'}
+                    pointer-events-none
+                    `}
                     muted
-                    ref={(el)=> (
+                    ref={(el)=> (  
                         videoRef.current[i] = el
         )}
-        
+        onEnded={() => (
+            i !== 3
+            ? handleProcess('video-end', i)
+            : handleProcess('video-last')
+        )}
         onPlay={()=> {
             setVideo((prevVideo)=> ({
                 ...prevVideo, isPlaying:true
@@ -138,7 +207,7 @@ const VideoCarousel = () => {
         <button className='control-btn'>
             {/* Double ternary operator */}
             <img src={isLastVideo ? replayImg : !isPlaying? playImg : pauseImg} alt={isLastVideo ? 'replay' : !isPlaying ? 'play' : 'pause'}
-            onClick={isLastVideo ? () => handleProcess('video=reset'): !isPlaying ? ()=> handleProcess('play'): () => handleProcess('pause')} />
+            onClick={isLastVideo ? () => handleProcess('video-reset'): !isPlaying ? ()=> handleProcess('play'): () => handleProcess('pause')} />
         </button>
     </div>
     </>
