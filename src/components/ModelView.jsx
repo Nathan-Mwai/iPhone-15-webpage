@@ -1,4 +1,6 @@
-import { PerspectiveCamera, View, Html } from '@react-three/drei'
+import { PerspectiveCamera, View, Html, OrbitControls } from '@react-three/drei'
+
+import * as THREE from 'three'
 import { Suspense } from 'react'
 import Lights from './Lights'
 import IPhone from './IPhone'
@@ -16,9 +18,26 @@ const ModelView = ({index, groupRef, gsapType, controlRef, setRotationSize, size
 
         <Lights/>
 
-        <Suspense >
-        <IPhone />
+        {/* This will enable me to be able to use my mouse to move the 3D */}
+        <OrbitControls
+        makeDefault
+        ref={controlRef}
+        enableZoom={false}
+        enablePan={false}
+        rotateSpeed={0.4}
+        target={new THREE.Vector3(0, 0, 0)}
+        onEnd={()=> setRotationState(controlRef.current.getAzimuthalAngle())}
+        />
+
+
+        <group ref={groupRef} name={`${index === 1} ? 'small : 'larger`} position={[0,0,0]}>
+
+        <Suspense fallback={<Html><div>Loading....</div></Html>}>
+        <IPhone
+        scale={index === 1 ? [15,15,15]: [17,17,17]}
+        />
         </Suspense>
+        </group>
     </View>
   )
 }
